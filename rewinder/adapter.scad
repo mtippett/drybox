@@ -1,41 +1,44 @@
 
-SPOOL_VENDOR = 0;
-SPOOL_BRAND = 1;
-SPOOL_DIAMETER = 2;
-
-
-// spoolInfo =  [ "Polymaker", 55 ] ;
-spoolInfo =  [ "California Filament","",54 ] ;
-
-            // [ 55 ] // prusa 
-
 spoolOverlap = 10;  // How far up the outside of the spool diameter we go
 hubDepth = 20;  // Assumign the rewinder hub is flush, how deep do we go
-spoolCollarHeight = 5;  // How much of a collar do we want to provide for the spool to sit on
-wallWidth=2;  // Thickness of the overlap and hub surround.
+spoolCollarHeight = 10;  // How much of a collar do we want to provide for the spool to sit on
+wallWidth=1.5;  // Thickness of the overlap and hub surround.
 rewinderDiameter = 48.1; // diameter of the gripless reqwinder
-fontHeight = 3.75;
-fontDepth = 1;
+fontHeight = 5;
+fontDepth = 0.75;
 
-echo (str("Generating Spool Adapter for ", spoolInfo));
 
-spoolDiameter = spoolInfo[SPOOL_DIAMETER];
-spoolVendor = spoolInfo[SPOOL_VENDOR];
-spoolBrand = spoolInfo[SPOOL_BRAND];
+// 52: Prusament
+// 53: California Filament Cardboard
+// 55: Polymaker
+// 56: California Filament Plastic
+
+
+// Spool diameters to generate, choose ones to print in slicer
+spoolDiameters = [50,51,52,53,54,55,56,57];
+
 
 
 // Set quality to high - so circles are circles.
-$fn=100;
-
-adapter();
+$fn=76;
 
 
+for(spoolDiameterIndex = [0:len(spoolDiameters) - 1]) {
+  spoolDiameter = spoolDiameters[spoolDiameterIndex];
+  assert(rewinderDiameter + wallWidth < spoolDiameter, str("Spool Diameter (" , spoolDiameter,") less than rewinder diameter (",rewinderDiameter,") + wall width (",wallWidth,") (",rewinderDiameter + wallWidth,")"))
+  
+  echo (spoolDiameters[spoolDiameterIndex]);
+  translate([spoolDiameterIndex*80,0,0])
+    adapter(spoolDiameter = spoolDiameter);
+    
+}
 
 
-module adapter(){
+
+module adapter(spoolDiameter){
     
     rewinderRadius = rewinderDiameter/2;
-    rewinderCoverRadius = rewinderRadius + 1;
+    rewinderCoverRadius = rewinderRadius + 0.5;
     spoolRadius = spoolDiameter/2;
     overlapRadius = spoolRadius + spoolOverlap;
     
@@ -54,15 +57,11 @@ module adapter(){
       }
       // Negative space through the middle
       cylinder(h=hubDepth*2+1,r=rewinderRadius,center=true);
-      translate([0,spoolRadius-1,-0.01])
+      translate([0,spoolRadius,-0.01])
       mirror([1,0,0])
       linear_extrude(height=fontDepth)
-      text(spoolVendor,fontHeight,halign="center");
+      text(str(spoolDiameter , "mm"),fontHeight,halign="center");
 
-      translate([0,-spoolRadius+1-3,-0.01])
-      mirror([1,0,0])
-      linear_extrude(height=fontDepth)
-      text(str(spoolBrand, " " , spoolDiameter , "mm"),fontHeight,halign="center");
     }
   }
 

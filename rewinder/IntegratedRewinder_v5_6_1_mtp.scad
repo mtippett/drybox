@@ -1,19 +1,30 @@
-// "assembly" gives assembly view with cutout; "print" STL output with all parts, other options select one specific
-// part.
+/*
+    Internal Spool Rewinder
+    Remix: Matthew Tippett
+    Original: Vincent Groenhuis
+
+   This integrated internal design is a rework of the  fifth iteration of Vincent's Spool Holder series, after the
+   original, parametric, universal and Sisyphus iterations.
+*/
+
+// Generate which output?  Core outputs are
+// 		assembly: Cross-sectional assembly stack
+// 		print: Complete hub ready to be assembled
+// 		clutch: End cap and clutch set (since iterations will likely be needed)
+//
+//  All other outputs are convenience outputs that generate only for the particular part in question, allowing for
+//	faster development
 output =
-    "print"; //[assembly,print,hub,clutchWheel,clutchFriction,clutch,cap,springs,springBase,springEven,springOdd,springTop,universalRewinderSpring]
+    "print"; //[assembly,print,clutch,hub,clutchWheel,clutchDial,clutchFriction,cap,springs,springBase,springEven,springOdd,springTop,universalRewinderSpring,hubHoles]
 
 /*
-    Integrated Auto-rewind Spool Holder
-    Vincent Groenhuis
+   This design continues with the original roots of the series with the spring wound up inside the cylindrical space of
+the hub, as opposed to the side spring designs. While the diameter is relatively small (45 mm-ish), almost the full
+width of the spool holder can be utilized allowing to stack many small springs and obtain sufficient rewinding
+revolutions at a good torque profile.
 
-    This integrated design is the fifth iteration in the Auto-Rewind Spool Holder series, after the original,
-   parametric, universal and Sisyphus iterations.
-
-    This design returns to the original roots of the series with the spring wound up inside the cylindrical space of the
-   hub, as opposed to the side spring designs. While the diameter is relatively small (45 mm-ish), almost the full width
-   of the spool holder can be utilized allowing to stack many small springs and obtain sufficient rewinding revolutions
-   at a good torque profile.
+   The intent is to provide a standard in-spool module that will support multiple spool sizes via the use of a simple
+   adapter (see adapter.scad).
 
     The default implementation does not include a dedicated clutch. The contact surface between rewinder and spool is
    used as slipping surface. The magnitude of the friction is determined by the combination of materials and its
@@ -177,14 +188,8 @@ output =
    // Thickness of bearing covers to avoid bearings sliding through the hub; one mm is enough
    bearingCoverThickness = 1;
 
-   // Relative hole size must be below 1 or else the individual gaps may merge into one big gap
-   hubHoleRelSize = 0.75;
-
    // Set to nonzero to force number of hub hole layers
    hubForceLevelCount = 0;
-
-   // Smaller value puts the hub holes closer to each other
-   hubHoleLevelSpacingFactor = 0.9;
 
    // Number of ribs around hub
    hubRibCount = 60;
@@ -192,11 +197,20 @@ output =
    // Thickness of rib (no effect is hub length is zero)
    hubRibWidth = 0.7;
 
-   // Number of holes in hub (per layer)
-   hubHoleCount = 6;
+   // Number of holes in hub (per layer).  Odd values allow for more pleasing rows that cross
+   hubHoleCount = 9;
 
    // Number of sides of hub hole polygons, higher numbers are less printable due to overhang angles
-   hubHolePolygonSize = 40;
+   hubHolePolygonSize = 4;
+
+   hubHoleScaleFactor = 0.5;
+
+   // Relative hole size must be below 1 or else the individual gaps may merge into one big gap
+   hubHoleRelSize = 0.7`;
+   // Smaller value puts the hub holes closer to each other
+   hubHoleLevelSpacingFactor = 0.75;
+
+   hubHoleTopMargin = 6;
 
    // Thread pitch
    threadPitch = 3;
@@ -296,18 +310,31 @@ output =
    withClutch = true; // [true,false]
    // Radius of the clutch wheel
    clutchWheelDiameter = 24.75;
-   clutchWheelHeight = 8;
-   clutchWheelChamferHeight = 3;
-
-   clutchsupportHeight = 5;
-   clutchFrictionWallWidth = 1;
-   clutchDialDepth = 3;
-
    // How much of a full circle does the clutch cover
    clutchPassRatio = 0.7;
-
    // diameter of the partial colums used to lock the cluch in place
    clutchSupportDiameter = 2;
+
+   clutchWheelHeight = 8;
+   clutchWheelChamferHeight = 3;
+   clutchsupportHeight = clutchWheelHeight - clutchWheelChamferHeight;
+   clutchFrictionWallWidth = 1;
+   // For the increasing clutch size, what do chunk the wedge size into
+   clutchWedgeMultiple = 0.8;
+   clutchFrictionIncrementSize = 0.2;
+   clutchDialDepth = 3;
+   clutRidgeSpacing = 3;
+
+   // enableLocking Ribs
+   withLockingRibs = true;
+   // How big (mm diameter semicircles) are the ribs
+   lockingRibsDiameter = 1;
+   // How many locking ribs (n/360 spacing)
+   lockingRibCount = 3;
+
+   // epsilon value to add when creating unions to avoid coincedent planes
+   // This should below the printing threshold, and shouldn't accumulate too much.
+   epsilon = 0.001;
 
    // Derived variables
    springDiameter = rewinderDiameter - 2 * (rewinderWallThickness + springHubClearance);
@@ -332,9 +359,9 @@ output =
    capThreadSize = rewinderDiameter - 2 * rewinderWallThickness + 2 * threadDepth;
 
    hubHoleStartZ = bearingWidth + bearingCoverThickness + springStackGap + springTabHeight + 1;
-   hubHoleEndZ = rewinderLength - bearingWidth - bearingCoverThickness - 2;
+   hubHoleEndZ = rewinderLength - bearingWidth - bearingCoverThickness - hubHoleTopMargin;
 
-   hubHoleSize = hubHoleRelSize * rewinderDiameter * PI / hubHoleCount;
+   hubHoleSize = hubHoleRelSize * rewinderDiameter * PI / hubHoleCount / hubHoleScaleFactor;
    hubHoleLevelCount =
        (hubForceLevelCount > 0 ? hubForceLevelCount
                                : floor((hubHoleEndZ - hubHoleStartZ) / (hubHoleSize * hubHoleLevelSpacingFactor)));
@@ -421,6 +448,8 @@ output =
 				   {
 					   color("black") translate([ hubSpacing * 2, 0, 0 ])
 					   clutchFriction();
+					   color("brown") translate([ hubSpacing * 3, 0, 0 ])
+					   clutchDial();
 				   }
 			   }
 			   if (springBladeCount >= 3)
@@ -494,9 +523,17 @@ output =
 	   {
 		   clutchFriction();
 	   }
+	   else if (output == "clutchDial")
+	   {
+		   clutchDial();
+	   }
 	   else if (output == "cap")
 	   {
 		   cap(withClutch = true);
+	   }
+	   else if (output == "hubHoles")
+	   {
+		   makeHubHoles();
 	   }
    }
 
@@ -508,6 +545,8 @@ output =
 	   clutchWheel();
 	   translate([ 0, maxDiameter, 0 ])
 	   clutchFriction();
+	   translate([ maxDiameter, maxDiameter, 0 ])
+	   clutchDial();
    }
    /*
        Creates a disc with emboss, acting as a handle and spool retainer. Used in both the hub and the cap. No center
@@ -579,7 +618,7 @@ output =
 	   }
    }
 
-   module segmentedRing(r, R, h, ratio = 0.7, alignGap = false, extraRotation = 0, wedge = 0)
+   module segmentedRing(r, R, h, ratio = 0.7, alignGap = false, extraRotation = 0, wedge = 0, ridgeSpacing = 0)
    {
 	   gapFudgeRotation = alignGap ? 120 * ratio / 2 : 0;
 
@@ -587,27 +626,43 @@ output =
 	   {
 		   rotate(a = i * 120 + extraRotation - gapFudgeRotation)
 		   {
-			   rotate_extrude(angle = 120 * ratio)
+			   for (i = [0:clutchFrictionIncrementSize:wedge])
 			   {
-				   translate([ r, 0, 0 ])
-				   {
-					   square(size = [ R - r, h ]);
-				   }
-			   }
+				   segmentAngle = 120 * ratio;
 
-			   for (i = [1:wedge])
-			   {
 				   translate([ 0, i, 0 ])
-				   rotate_extrude(angle = 120 * ratio)
 				   {
-					   translate([ r, 0, 0 ])
+					   rotate_extrude(angle = segmentAngle)
 					   {
-						   square(size = [ R - r, h ]);
+						   translate([ r, 0, 0 ])
+						   {
+							   square(size = [ R - r, h ]);
+						   }
+					   }
+					   if (ridgeSpacing > 0)
+					   {
+						   for (ridgeAngle = [0:ridgeSpacing:segmentAngle])
+						   {
+							   translate([ R * cos(ridgeAngle), R * sin(ridgeAngle), 0 ])
+							   {
+								   cylinder(r = 0.2, h = h);
+							   }
+						   }
 					   }
 				   }
 			   }
 		   }
 	   }
+   }
+
+   module clutchDial()
+   {
+	   translate([
+		   -120,
+		   -120,
+		   0,
+	   ])
+	   import("remix/clutch_dial.stl");
    }
 
    module clutchFriction()
@@ -623,12 +678,14 @@ output =
 
 	   connectorDepth = outerClutchRingInnerRadius - innerClutchRingInnerRadius;
 
+	   // FIXME
 	   fudge = clutchPassRatio * 360 / 2;
-	   clutchEngagementHeighte = clutchWheelHeight - clutchWheelChamferHeight;
+	   clutchEngagementHeight = clutchWheelHeight - clutchWheelChamferHeight;
 
-	   segmentedRing(r = innerClutchRingInnerRadius, R = innerClutchRingOuterRadius, h = clutchEngagementHeighte,
-	                 ratio = 0.9, extraRotation = 95 + fudge, wedge = 2);
-	   ring(r = outerClutchRingInnerRadius, R = outerClutchRingOuterRadius, h = clutchWheelHeight);
+	   segmentedRing(r = innerClutchRingInnerRadius, R = innerClutchRingOuterRadius, h = clutchEngagementHeight,
+	                 ratio = 0.9, extraRotation = 95 + fudge, wedge = clutchWedgeMultiple,
+	                 ridgeSpacing = clutRidgeSpacing);
+	   ring(r = outerClutchRingInnerRadius, R = outerClutchRingOuterRadius, h = clutchEngagementHeight + 1);
 
 	   for (i = [0:2])
 	   {
@@ -636,13 +693,26 @@ output =
 		   {
 			   translate([ 0, outerClutchRingOuterRadius, 0 ])
 			   {
-				   cylinder(h = clutchWheelHeight, r = clutchSupportDiameter / 2, center = false);
+				   cylinder(h = clutchEngagementHeight + 1, r = clutchSupportDiameter / 2, center = false);
 			   }
 			   rotate(fudge)
 			   translate([ -2, innerClutchRingInnerRadius, 0 ])
 			   {
-
-				   cube([ clutchSupportDiameter, connectorDepth, clutchEngagementHeighte ]);
+				   cube([ clutchSupportDiameter, connectorDepth, clutchEngagementHeight ]);
+			   }
+		   }
+		   rotate(a = 10)
+		   {
+			   translate([ 0, outerClutchRingOuterRadius, 0 ])
+			   {
+				   cylinder(h = clutchEngagementHeight + 1, r = clutchSupportDiameter / 2, center = false);
+			   }
+		   }
+		   rotate(a = 120 + 20)
+		   {
+			   translate([ 0, outerClutchRingOuterRadius, 0 ])
+			   {
+				   cylinder(h = clutchEngagementHeight + 1, r = clutchSupportDiameter / 2, center = false);
 			   }
 		   }
 	   }
@@ -727,8 +797,11 @@ output =
 				   translate([ 0, 0, bearingWidth + bearingCoverThickness ])
 				   cylinder(d = rewinderDiameter - 2 * rewinderWallThickness, h = rewinderLength);
 			   }
-			   translate([ 0, 0, bearingWidth + bearingCoverThickness ])
-			   baseSpringAttachmentTabs();
+			   if (!withClutch)
+			   {
+				   translate([ 0, 0, bearingWidth + bearingCoverThickness ])
+				   baseSpringAttachmentTabs();
+			   }
 		   }
 		   // space for bearing
 		   translate([ 0, 0, -0.1 ])
@@ -772,25 +845,29 @@ output =
 				            h = springBladeWidth + 2 + springStackGap + 0.2);
 			   }
 		   }
-		   for (i = [0:springBaseTabCount - 1], a = 360 * i / springBaseTabCount)
+		   if (springBaseTabCount > 0)
 		   {
-			   rotate([ 0, 0, a ])
+			   for (i = [0:springBaseTabCount - 1], a = 360 * i / springBaseTabCount)
 			   {
-				   translate([ 0, 0, 0 ])
+				   echo(str("a = ", a, "; springBaseTabCount = ", springBaseTabCount));
+				   rotate([ 0, 0, 0 ])
 				   {
-					   linear_extrude(height = springStackGap + springBladeWidth)
+					   translate([ 0, 0, 0 ])
 					   {
-						   polygon(points = [
-							   [ 0, 0 ],
-							   [
-								   rewinderDiameter * cos(springBaseTabAngle / 2),
-								   rewinderDiameter * sin(springBaseTabAngle / 2)
-							   ],
-							   [
-								   rewinderDiameter * cos(springBaseTabAngle / 2),
-								   -rewinderDiameter * sin(springBaseTabAngle / 2)
-							   ]
-						   ]);
+						   linear_extrude(height = springStackGap + springBladeWidth)
+						   {
+							   polygon(points = [
+								   [ 0, 0 ],
+								   [
+									   rewinderDiameter * cos(springBaseTabAngle / 2),
+									   rewinderDiameter * sin(springBaseTabAngle / 2)
+								   ],
+								   [
+									   rewinderDiameter * cos(springBaseTabAngle / 2),
+									   -rewinderDiameter * sin(springBaseTabAngle / 2)
+								   ]
+							   ]);
+						   }
 					   }
 				   }
 			   }
@@ -835,7 +912,8 @@ output =
 							   {
 								   rotate([ 0, 0, 90 ])
 								   {
-									   cylinder(d = hubHoleSize, h = rewinderDiameter + 1, $fn = hubHolePolygonSize);
+									   scale([ 1, hubHoleScaleFactor, 1 ]) cylinder(
+									       d = hubHoleSize, h = rewinderDiameter + 1, $fn = hubHolePolygonSize);
 								   }
 							   }
 						   }
@@ -959,6 +1037,20 @@ output =
 						   }
 					   }
 				   }
+				   rotate(a = 10)
+				   {
+					   translate([ 0, clutchSupportInner, 0 ])
+					   {
+						   cylinder(h = clutchsupportHeight + 1, r = clutchSupportDiameter / 2, center = false);
+					   }
+				   }
+				   rotate(a = 120 + 20)
+				   {
+					   translate([ 0, clutchSupportInner, 0 ])
+					   {
+						   cylinder(h = clutchsupportHeight + 1, r = clutchSupportDiameter / 2, center = false);
+					   }
+				   }
 			   }
 		   }
 	   }
@@ -1011,7 +1103,30 @@ output =
 				   for (i = [0:2])
 				   {
 					   segmentedRing(r = clutchSupportInnerRadius, R = clutchSupportInnerRadius + clutchSupportWidth,
-					                 h = supportOffset, ratio = clutchPassRatio, extraRotation = 90 + 60 * .3);
+					                 h = supportOffset, ratio = clutchPassRatio,
+					                 extraRotation = 90 + 60 * (1 - clutchPassRatio));
+				   }
+			   }
+		   }
+		   dotCount = 8;
+		   dotStartOffset = 10;
+		   dotAngleRange = 120 * clutchPassRatio - 2 * dotStartOffset;
+		   dotAngleIncrement = dotAngleRange / (dotCount - 1);
+		   dotSizeStart = 0.5;
+		   dotSizeEnd = 1.25;
+		   dotRange = dotSizeEnd - dotSizeStart;
+		   dotSizeIncrement = dotRange / dotAngleRange;
+		   dotCenterline = clutchSupportOuterRadius + 2.5;
+
+		   for (i = [0:2])
+		   {
+			   rotate(a = i * 120 + 60 * (1 - clutchPassRatio))
+			   {
+				   for (i = [0:dotAngleIncrement:dotAngleRange])
+				   {
+					   rotate(i + dotStartOffset)
+					   translate([ 0, dotCenterline, -epsilon ])
+					   cylinder(r = dotSizeStart + i * dotSizeIncrement, h = 0.5);
 				   }
 			   }
 		   }
@@ -1481,6 +1596,36 @@ output =
 		   {
 			   cylinder(r = r, h = h + 1);
 		   }
+	   }
+   }
+
+   module adapter()
+   {
+	   rewinderRadius = rewinderDiameter / 2;
+	   rewinderCoverRadius = rewinderRadius + 1;
+	   spoolRadius = spoolDiameter / 2;
+	   overlapRadius = spoolRadius + spoolOverlap;
+
+	   $fn = 100;
+
+	   difference()
+	   {
+		   union()
+		   {
+			   // Snug fit attachement to the
+			   cylinder(h = hubDepth, r = rewinderCoverRadius, center = false);
+
+			   // Step that the spool sits on
+			   cylinder(h = spoolCollarHeight, r = spoolRadius, center = false);
+
+			   // Flat part on outside of spool
+			   cylinder(h = wallWidth, r = overlapRadius, center = false);
+		   }
+		   // Negative space through the middle
+		   cylinder(h = hubDepth * 2 + 1, r = rewinderRadius, center = true);
+		   translate([ 0, spoolRadius, -0.01 ])
+		   mirror([ 1, 0, 0 ]) linear_extrude(height = fontDepth)
+		       text(str(spoolDiameter, "mm"), fontHeight, halign = "center");
 	   }
    }
 
